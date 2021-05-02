@@ -1,0 +1,290 @@
+\documentclass[a4paper,papersize,10pt]{jsarticle}
+\title{CATIAマクロ入門}
+\usepackage[dvipdfmx]{graphicx}
+\usepackage{ascmac, here, txfonts, txfonts}
+\usepackage{color}
+\usepackage{listings}
+\usepackage{makeidx}
+\author{80426 上村}
+\date{2020年9月13日}
+
+\lstset{
+	language={VBScript},
+	backgroundcolor={\color[gray]{0.95}},
+	basicstyle={\ttfamily},
+	identifierstyle={\ttfamily},
+	commentstyle={\ttfamily \color[rgb]{0,0.5,0}},
+	keywordstyle={\ttfamily \color[rgb]{0.5,0,0.5}},
+	ndkeywordstyle={\ttfamily},
+	stringstyle={\ttfamily \color[rgb]{0,0,1}},
+	frame={single},
+	breaklines=true,
+	columns=[l]{fullflexible},
+	numbers=left,
+	xrightmargin=0zw,
+	xleftmargin=3zw,
+	numberstyle={\ttfamily},
+	stepnumber=1,
+	numbersep=1zw,
+	morecomment=[l]{//}
+}
+\makeindex
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+\section{はじめに}
+
+\subsection{前提}
+\noindent
+CATIA V5の\textgt{標準コマンド、使われ方を知らずしてCATIAマクロを作成するのは無謀}です。
+安定したプログラムを作成するには使われ方を想定しそれに対応できる処理を書く必要があるからです。\\
+またプログラミング以前にユーザーとの会話（要望ヒアリング、構想作成、作図ロジック）を行い\textgt{使う側と一緒に作り上げる}
+スタイルで進めることは避けられません。（使う人と作る人が同じなら別ですが）\\
+研究所の中でCATIAユーザ（主に設計者）が\textgt{どんなコマンド}を使って\textgt{どのような使い方}をしているか\textgt{まず知ること}が
+良いプログラム(ツール)を作成する上では必須になります。\\
+
+\begin{table}[htb]
+	\begin{center}
+		\caption{CATIA V5知識}
+		\begin{tabular}{lll}
+			\hline
+			機能 & ワークベンチ & 教材 \\
+			\hline
+			3D作図			&	GSD, PD							&	CATIA初級教育教材(STEP1～6) \\
+			2D作図			&	2Dレイアウト, ドラフティング	&	CATIA初級教育教材(STEP7,8) \\
+			プロダクト操作	&	アセンブリーデザイン			&	CATIA初級教育教材(STEP4) \\
+			DMU				&	キネマ、フィッティング			&	達人教育教材 \\
+			ナレッジ		&	ナレッジアドバイザー\label{KWA}\index{ナレッジアドバイザー}	&	達人教育教材\\
+			\hline
+		\end{tabular}
+	\label{TAB:CAT_SKILL}
+	\end{center}
+\end{table}
+
+\noindent
+\textgt{CATIAの使われ方を知る}には表\ref{TAB:CAT_SKILL}の知識
+\footnote{
+	\label{CAT_SKILL_NOTE}
+		解決しようとする課題（ツール化しようとする内容）に応じて段階的に習得していくのが実際です。経験者からアドバイスをもらいながら進めましょう。
+}
+を身に付けた上、\textgt{設計者と会話する}ことになります。
+現場での作図業務を経験することが望ましいですが、ここまで経験することは時間がかかるので難しいでしょう。\\
+また本文書は\textgt{VBの基本構文の解説までは記載していません}のでご了承ください。
+
+
+\subsection{対象と規模}
+\noindent
+本来、マクロは\textgt{操作の自動化}を行うものです。プログラミング以前に\textgt{自動化したい内容が明確に定まっている}ことが必要です。
+またその内容は\textgt{誰がやっても同じ結果になるようなブレのないフローとして固まって}いなければいけません。
+もっとも\textgt{ユーザー（主に設計者）と会話しながら決めていく部分はあっても構いません}が、最終的に誤解の生じない明確な手順に
+落とせるかがプログラム（ツール）化することの\textgt{必要条件}です。マクロ適用の\textgt{対象があいまいな状態では作ったとしても
+安定して動くものにはならない}でしょう。
+
+\noindent
+CATIAマクロは\textgt{インプット}情報を貰って\textgt{プロセス（ロジック）}を経て\textgt{アウトプット}に辿り着く道のりをVBという言葉で
+CATIAやエクセルに対して命令を記述した文の塊です。気を付けなければならいないのは下の二つです。（KISSの法則
+\footnote{
+	\label{KISS_RULE}
+		\b{k}eep \b{i}t \b{s}imple, \b{s}tupid!または\b{k}eep \b{i}t \b{s}hort and \b{s}imple. 1960年代の米国海軍において言われた
+		経験的な原理・原則。設計の単純性、簡潔性は成功へのカギであり、不必要な複雑性は避けるべきとの考え。
+}
+）
+\begin{itemize}
+	\item インプット数（種類）が多すぎる（せいぜい5～10個）
+	\item ロジックが複雑すぎる
+\end{itemize}
+多くのアウトプットを得ようとするとインプットが多くなるものです。しかし\textgt{使う側にとって最初に訪れる壁}が\textgt{インプット準備の手間}です。
+ここでやたら多くのインプットを準備するとなると\textgt{嫌気がさし使ってもらえなくなり}ます。またプログラムの\textgt{適用場面が絞られて}しまいます。
+
+\noindent
+プログラムがどんな仕事をしてアウトプットが出てきているのか理解できない\textgt{ブラックボックスなツール}になってしまうと
+ロジックを語ることが出来ず\textgt{設計者には敬遠}されますので注意しましょう。利用状況に合わせて\textgt{段階的に機能を追加}する、
+\textgt{機能を分けて柔軟性を持たせる}といった工夫を行いましょう。
+
+\section{事前知識}
+
+\subsection{CATIAマクロの種類}
+
+CATIAのマクロには下の3つの種類があります。サマリーは以下になります。
+\begin{table}[htb]
+	\begin{center}
+		\caption{CATIAマクロの種類}
+		\begin{tabular}{lccccc}
+			\hline
+			種類			&	作り易さ	&	保存方法		&	UI	&	起動	&	パスワード\\
+			\hline
+			VBA				&	〇			&	別ファイル		&	〇	&	△	&	〇\\
+			CATScript		&	×			&	別ファイル		&	×	&	〇	&	×\\
+			VBスクリプト	&	×			&	CATIAファイル内	&	×	&	〇	&	×\\
+			\hline
+		\end{tabular}
+	\end{center}
+\end{table}
+
+\begin{description}
+\item[VBA] \textgt{初心者はまずこれで}作りましょう。
+	\begin{itemize}
+		\item \textgt{Excelマクロと同様}の専用エディターで作成します。
+		\item \textgt{モジュール、クラス}が作成でき\textgt{フォーム}のデザインも\textgt{可能}です。
+		\item CATIAデータとは別ファイルになります。(*.catvba)
+		\item \textgt{マクロ起動}はCATIAメニューの中から実施するので\textgt{多少手間}になります。
+		\item \textgt{パスワード設定}することが\textgt{可能}です。
+	\end{itemize}
+\item[]
+\item[CATScript] UIは作成できませんが、\textgt{起動がお手軽}です。
+	\begin{itemize}
+		\item CATIAの専用エディターで作成しますが、\textgt{すごく使いにくい}です。
+		\item \textgt{サブルーチン分けしかできません}。UIも作成できません。
+		\item CATIAデータとは別ファイルになります。(*.catscript)
+		\item \textgt{ダブルクリックで起動}できます。（VBA同様にメニューからでもできます）
+		\item パスワード出来ません。
+	\end{itemize}
+\item[]
+\item[VBスクリプト] CATIAのツリーに埋め込めるスクリプトです。
+	\begin{itemize}
+		\item CATIAの専用エディターで作成しますが、\textgt{すごく使いにくい}です。
+		\item サブルーチン分けしかできませんが\textgt{引数指定が可能}です。UIは作成できません。
+		\item \textgt{CATIAのツリーに埋め込みが可能}です。
+		\item \textgt{ツリーから起動が出来るのでお手軽}です。
+		\item パスワード設定することは出来ません。
+	\end{itemize}
+
+\end{description}
+
+それぞれに長所、短所がありますが、現在の研究所のツールは\textgt{作り易さを優先}してほとんどが\textgt{VBA}で作成しています。ただし最近のTMCの動きでは
+\textgt{CATScriptをダブルクリックするだけでツールを起動}
+\footnote{
+	\label{CATSCR}
+	CATScriptにマクロ本体を記述する、またはCATScriptから本体のVBAを起動させることで、『ツール→マクロ→マクロ→VBAファイルの選択』の手間を省いています。
+}
+させるといった\textgt{よりユーザーが使い易い工夫}を取り込んでいます。今後は\textgt{研究所も変えていかなければいけません}。
+なお、VBスクリプトはナレッジアドバイザーの機能になります。(ページp\pageref{KWA}参照)
+
+\subsection{コーディングスタイル}
+\subsubsection{型指定}
+二つのスタイルがあります。
+\begin{itemize}
+	\item 変数の型を\textgt{明示}
+	\item 変数の型を\textgt{省略}
+\end{itemize}
+
+変数の型を\textgt{明示}するスタイルは型を指定した記述方法になります。例えば以下です。
+\begin{lstlisting}
+	Dim fct As HybridShapeFactory
+	Set fct = prt.HybridShapeFactory
+
+	Dim hybbd As HybridBody
+	Set hybbd = prt.HybridBodies.Add
+	...
+\end{lstlisting}
+
+一方、変数の型を\textgt{省略}するスタイルはVariant型での記述方法になります。例えば以下です。
+\begin{lstlisting}
+	Dim fct As Variant
+	Set fct = prt.HybridShapeFactory
+
+	Dim hybbd As Variant
+	Set hybbd = prt.HybridBodies.Add
+	...
+\end{lstlisting}
+
+コーディングする際は明示型の方がインテリセンスの表示、コンパイル時の構文チェックなどシステムが
+行ってくれますので作りやすいです。しかし\textgt{\ref{CAT_RELUP}節 CATIAのリリースアップ}(p\pageref{CAT_RELUP})で
+記述するように\textgt{CATIAのリリースアップ時には明示型はマクロのメンテナンスが必要}になります。
+
+\subsubsection{命名ルール（分かり易い書き方）}
+Dassault Systemesの提供するCATIAマクロは型名やメソッド名、プロパティ名は\textgt{キャメル記法}で作成されています。
+これを参考に我々は分かり易いプログラミングを行わなければなりません。\\
+
+細部の命名ルールまで規制を作ったとしてもそれを守るかどうかは個人の良識に委ねられています。
+一般的には英単語を用い、省略しながらプログラミングを行いますが、トヨタ語の扱い、英語のスキル、その省略の内容まで
+統一させることは現実的に出来ません。
+
+重要な事は\textgt{メンテナンスする人が見て}分かり易いプログラムを書くことです。これまでの経験から以下を記しておきます。
+
+\begin{itemize}
+\item 小分けにしましょう 短く､簡潔に。
+%	\begin{itemize}
+%		\item 一つのスコープが長くならないようサブルーチンに分けて作成しましょう。\\
+%		没頭しているとif文, for文は長くなりがちです。読む人の事を考えてサブルーチンに分けて読みやすくしましょう。(目安:50～100行)
+%	\end{itemize}
+%\item 階層をつけましょう/ 字下げ・空行で見やすく。
+%	\begin{itemize}
+%		\item スコープの中は字下げしましょう。また空行を入れると見やすくなります。
+%			\begin{lstlisting}
+%				For idx =  1 To UBound(inf)
+%					If hybbd Is Nothing Then
+%						Set hybbd = prt.HybridBodies.Add
+%						hybbd.Name = Format(Now, "YYYYMMDD HH:NN:SS")
+%					End If
+%
+%					f = CATIA.FileSystemObject.CreateFile("D:\CATWork\" & hybbd.Name & "txt")
+%					txt = f.OpenAsTextStream("ForWriting")
+%					' output spot info...
+%					txt.close
+%				Next
+%					...
+%			\end{lstlisting}
+%
+%			\begin{lstlisting}
+%				For idx =  1 To UBound(inf)
+%				If hybbd Is Nothing Then
+%				Set hybbd = prt.HybridBodies.Add
+%				hybbd.Name = Format(Now, "YYYYMMDD HH:NN:SS")
+%				End If
+%				f = CATIA.FileSystemObject.CreateFile("D:\CATWork\" & hybbd.Name & "txt")
+%				txt = f.OpenAsTextStream("ForWriting")
+%				' output spot info...
+%				txt.close
+%				Next
+%				...
+%			\end{lstlisting}
+%	\end{itemize}
+\item 変数名、サブルーチン名には意味を持たせましょう
+\item コメントには見る人がありがたいことを書きましょう
+\item 引数、戻り値で情報を渡しましょう
+\end{itemize}
+
+初心者の内はここまで気にしている余裕はないでしょう。しかしメンテナンスする人（作成したあなた自身かも知れないしそうでないかもしれない）に
+優しい書き方にしておきましょう。
+\footnote{
+		経験者からアドバイスをもらいながら作りましょう。
+}
+
+\subsection{CATIAのリリースアップ}\label{CAT_RELUP}
+
+\subsection{配布時の注意}
+
+\section{パーツ単品での作業}
+\section{プロダクト環境下での作業}
+
+\section{一つ上のレベルのお話（基礎数学）}
+\noindent
+CADプログラミング、特に\textgt{独自計算処理を構築}する上で\textgt{基礎数学の知識}は必須です。\\
+インターネットが発達した現在ではネット検索すれば関係する記事を探すことは容易です。しかしながら
+その記事を\textgt{自分が作成しているプログラムに置き換える工程}は必ず必要になり、
+これが出来るかどうかは操作の自動化レベルで留まるか、一段上の独自ロジックを構築できるかの\textgt{違いの一つ}になります。
+またアウトプットに辿り着くまでの道のりを手作業とは違う\textgt{数学的なアプローチ}で考えられるかどうかも必要なスキルです。残念なことに
+これらは\textgt{手順書を通して一朝一夕で身に付くようなスキルではありません}。素養もあるかもしれませんし、世の中には上には上もいます。\\
+一つ言えることは、効率化する対象にもよって違いはありますが、これまでCATIAマクロ作成を経験した人であれば\textgt{数学と全く無縁で
+いることはできないと感じている}ということです。\\
+ここではよく使う公式をいくつか紹介しておきます。式を記憶する必要は全くありませんが\textgt{内容を理解できるレベル}に
+なることが望ましいです。\ref{PURE_MATH}
+
+
+\footnote{
+	\label{PURE_MATH}
+	本来、純粋数学とは定理・証明の繰り返し、組合せで構築されていますがここまで出来る必要はないと思います。
+}
+\subsection{三角関数}
+
+\subsection{行列}
+\subsection{ベクトル}
+\subsection{曲線・曲面}
+\subsection{位相と幾何}
+
+\printindex
+
+\end{document}
